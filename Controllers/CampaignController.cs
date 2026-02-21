@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Enes.Data;
 using Enes.Models;
 
 namespace Enes.Controllers;
@@ -7,56 +9,75 @@ namespace Enes.Controllers;
 [Route("api/[controller]")]
 public class CampaignController : ControllerBase
 {
-    private static List<Campaign> _campaigns = new List<Campaign>();
+    private readonly AppDbContext _db;
 
-    [HttpGet]
-    public IActionResult GetAll(string? city)
+    public CampaignController(AppDbContext db)
     {
-        if (!string.IsNullOrEmpty(city))
-        {
-            var filtered = _campaigns
-                .Where(c => c.City.ToLower() == city.ToLower())
-                .ToList();
+        _db = db;
+    }
 
-            return Ok(filtered);
+    // GET: /api/campaign?city=Istanbul
+    [HttpGet]
+    public async Task<IActionResult> GetAll([FromQuery] string? city)
+    {
+        IQueryable<Campaign> q = _db.Campaigns;
+
+        if (!string.IsNullOrWhiteSpace(city))
+        {
+            var cityNorm = city.Trim().ToLower();
+            q = q.Where(c => c.City.ToLower() == cityNorm);
         }
 
-        return Ok(_campaigns);
+        var result = await q.AsNoTracking().ToListAsync();
+        return Ok(result);
     }
 
-    [HttpPost]
-    public IActionResult Create(Campaign campaign)
+    // GET: /api/campaign/5
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetById(int id)
     {
-        campaign.Id = _campaigns.Count + 1;
-        _campaigns.Add(campaign);
+        var campaign = await _db.Campaigns.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
+        return campaign is null ? NotFound("Campaign not found") : Ok(campaign);
+    }
+
+    // POST: /api/campaign
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] Campaign campaign)
+    {
+        // Id'yi client göndermesin diye sıfırlayalım
+        campaign.Id = 0;
+
+        _db.Campaigns.Add(campaign);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetById), new { id = campaign.Id }, campaign);
+    }
+
+    // PUT: /api/campaign/5
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> Update(int id, [FromBody] Campaign updated)
+    {
+        var campaign = await _db.Campaigns.FirstOrDefaultAsync(c => c.Id == id);
+        if (campaign is null) return NotFound("Campaign not found");
+
+        campaign.Title = updated.Title;
+        campaign.City = updated.City;
+        campaign.Description = updated.Description;
+
+        await _db.SaveChangesAsync();
         return Ok(campaign);
     }
 
-    [HttpDelete("{id}")]
-    public IActionResult Delete(int id)
+    // DELETE: /api/campaign/5
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete(int id)
     {
-        var campaign = _campaigns.FirstOrDefault(c => c.Id == id);
+        var campaign = await _db.Campaigns.FirstOrDefaultAsync(c => c.Id == id);
+        if (campaign is null) return NotFound("Campaign not found");
 
-        if (campaign == null)
-            return NotFound("Campaign not found");
-
-        _campaigns.Remove(campaign);
+        _db.Campaigns.Remove(campaign);
+        await _db.SaveChangesAsync();
 
         return Ok("Deleted successfully");
-    }
-
-    [HttpPut("{id}")]
-    public IActionResult Update(int id, Campaign updatedCampaign)
-    {
-        var campaign = _campaigns.FirstOrDefault(c => c.Id == id);
-
-        if (campaign == null)
-            return NotFound("Campaign not found");
-
-        campaign.Title = updatedCampaign.Title;
-        campaign.City = updatedCampaign.City;
-        campaign.Description = updatedCampaign.Description;
-
-        return Ok(campaign);
     }
 }
