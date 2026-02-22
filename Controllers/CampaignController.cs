@@ -16,7 +16,6 @@ public class CampaignController : ControllerBase
         _context = context;
     }
 
-    // ✅ Pagination + sorting + optional city filter
     // GET /api/Campaign?page=1&pageSize=10&sort=id_desc&city=Istanbul
     [HttpGet]
     public async Task<IActionResult> GetAll(
@@ -32,7 +31,10 @@ public class CampaignController : ControllerBase
         IQueryable<Campaign> query = _context.Campaigns.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(city))
-            query = query.Where(c => c.City == city);
+        {
+            var cityLower = city.Trim().ToLower();
+            query = query.Where(c => c.City != null && c.City.ToLower() == cityLower);
+        }
 
         query = sort?.ToLower() switch
         {
@@ -64,8 +66,6 @@ public class CampaignController : ControllerBase
         });
     }
 
-    // ✅ GET BY ID
-    // GET /api/Campaign/3
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById([FromRoute] int id)
     {
@@ -74,12 +74,12 @@ public class CampaignController : ControllerBase
         return Ok(campaign);
     }
 
-    // ✅ CREATE
-    // POST /api/Campaign
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] Campaign campaign)
     {
-        // Güvenli olsun diye ID'yi sıfırla (DB üretsin)
+        if (string.IsNullOrWhiteSpace(campaign.Title) || string.IsNullOrWhiteSpace(campaign.City))
+            return BadRequest("Title ve City zorunlu.");
+
         campaign.Id = 0;
 
         _context.Campaigns.Add(campaign);
@@ -88,11 +88,12 @@ public class CampaignController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = campaign.Id }, campaign);
     }
 
-    // ✅ UPDATE
-    // PUT /api/Campaign/3
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update([FromRoute] int id, [FromBody] Campaign updated)
     {
+        if (string.IsNullOrWhiteSpace(updated.Title) || string.IsNullOrWhiteSpace(updated.City))
+            return BadRequest("Title ve City zorunlu.");
+
         var existing = await _context.Campaigns.FirstOrDefaultAsync(c => c.Id == id);
         if (existing == null) return NotFound();
 
@@ -104,8 +105,6 @@ public class CampaignController : ControllerBase
         return Ok(existing);
     }
 
-    // ✅ DELETE
-    // DELETE /api/Campaign/3
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete([FromRoute] int id)
     {
