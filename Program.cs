@@ -5,16 +5,17 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Services
 builder.Services.AddControllers();
+
+// PostgreSQL bağlantısı
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ✅ EF Core (PostgreSQL)
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
-
 var app = builder.Build();
 
-// Swagger aktif et
+// Swagger aktif et (Development modunda)
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
